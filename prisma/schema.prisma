@@ -1,0 +1,298 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =====================
+// User & Authentication
+// =====================
+
+enum UserRole {
+  ADMIN
+  APPLICANT
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String?   @unique
+  emailVerified DateTime?
+  password      String?
+  name          String?
+  role          UserRole  @default(APPLICANT)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  applicant     Applicant?
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// =====================
+// Academic Year
+// =====================
+
+model AcademicYear {
+  id        String   @id @default(cuid())
+  year      String   @unique // e.g., "2567", "2568"
+  name      String   // e.g., "ปีการศึกษา 2567"
+  isActive  Boolean  @default(false)
+  startDate DateTime
+  endDate   DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  courses     Course[]
+  applicants  Applicant[]
+
+  @@map("academic_years")
+}
+
+// =====================
+// Course (หลักสูตร)
+// =====================
+
+model Course {
+  id              String       @id @default(cuid())
+  code            String       // รหัสหลักสูตร
+  name            String       // ชื่อหลักสูตร
+  description     String?      @db.Text
+  capacity        Int          // จำนวนที่เปิดรับ
+  registrationStart DateTime   // วันเริ่มรับสมัคร
+  registrationEnd   DateTime   // วันสิ้นสุดรับสมัคร
+  isOpen          Boolean      @default(false)
+  academicYearId  String
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  academicYear    AcademicYear @relation(fields: [academicYearId], references: [id])
+  applicants      Applicant[]
+
+  @@unique([code, academicYearId])
+  @@map("courses")
+}
+
+// =====================
+// Applicant (ผู้สมัคร)
+// =====================
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum ApplicationStatus {
+  DRAFT              // ร่าง
+  SUBMITTED          // ยื่นสมัครแล้ว
+  DOCUMENT_REVIEW    // ตรวจเอกสาร
+  APPROVED           // อนุมัติ/มีสิทธิ์สอบ
+  REJECTED           // ไม่ผ่าน
+  EXAM_PASSED        // สอบผ่าน
+  EXAM_FAILED        // สอบไม่ผ่าน
+  ENROLLED           // ลงทะเบียนเรียนแล้ว
+}
+
+model Applicant {
+  id                  String            @id @default(cuid())
+  
+  // Application Info
+  applicationNumber   String            @unique // เลขที่ใบสมัคร
+  
+  // Personal Info
+  nationalId          String            // เลขบัตรประชาชน
+  prefix              String            // คำนำหน้า
+  firstName           String
+  lastName            String
+  firstNameEn         String?
+  lastNameEn          String?
+  gender              Gender
+  birthDate           DateTime
+  nationality         String            @default("ไทย")
+  religion            String?
+  
+  // Contact Info
+  phone               String?
+  email               String?
+  
+  // Address
+  address             String?           @db.Text
+  subDistrict         String?
+  district            String?
+  province            String?
+  postalCode          String?
+  
+  // Parent Info
+  fatherName          String?
+  fatherPhone         String?
+  fatherOccupation    String?
+  motherName          String?
+  motherPhone         String?
+  motherOccupation    String?
+  guardianName        String?
+  guardianPhone       String?
+  guardianRelation    String?
+  
+  // Education Background
+  previousSchool      String?
+  previousGrade       String?
+  gpa                 Float?
+  
+  // Application Status
+  status              ApplicationStatus @default(DRAFT)
+  submittedAt         DateTime?
+  approvedAt          DateTime?
+  approvedBy          String?
+  
+  // Exam Info
+  examRoomId          String?
+  seatNumber          Int?
+  examScore           Float?
+  examResult          String?
+  
+  // Relations
+  userId              String?           @unique
+  courseId            String
+  academicYearId      String
+  
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  user                User?             @relation(fields: [userId], references: [id])
+  course              Course            @relation(fields: [courseId], references: [id])
+  academicYear        AcademicYear      @relation(fields: [academicYearId], references: [id])
+  examRoom            ExamRoom?         @relation(fields: [examRoomId], references: [id])
+  documents           ApplicantDocument[]
+
+  @@index([nationalId])
+  @@index([applicationNumber])
+  @@index([status])
+  @@map("applicants")
+}
+
+// =====================
+// Documents
+// =====================
+
+model ApplicantDocument {
+  id          String    @id @default(cuid())
+  applicantId String
+  type        String    // ประเภทเอกสาร
+  fileName    String
+  filePath    String
+  fileSize    Int
+  mimeType    String
+  isVerified  Boolean   @default(false)
+  verifiedAt  DateTime?
+  verifiedBy  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  applicant   Applicant @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+
+  @@map("applicant_documents")
+}
+
+// =====================
+// Exam Room (ห้องสอบ)
+// =====================
+
+model ExamRoom {
+  id          String   @id @default(cuid())
+  roomNumber  String   // เลขห้อง
+  building    String?  // อาคาร
+  floor       String?  // ชั้น
+  capacity    Int      // ความจุ
+  currentCount Int     @default(0) // จำนวนคนปัจจุบัน
+  isActive    Boolean  @default(true)
+  isFull      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  applicants  Applicant[]
+
+  @@unique([roomNumber, building])
+  @@map("exam_rooms")
+}
+
+// =====================
+// Terms & Conditions
+// =====================
+
+model TermsCondition {
+  id        String   @id @default(cuid())
+  title     String
+  content   String   @db.Text
+  version   String
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("terms_conditions")
+}
+
+// =====================
+// Audit Log
+// =====================
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  action      String   // CREATE, UPDATE, DELETE
+  tableName   String
+  recordId    String
+  oldData     Json?
+  newData     Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([tableName, recordId])
+  @@index([userId])
+  @@map("audit_logs")
+}
