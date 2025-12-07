@@ -40,22 +40,22 @@ async function main() {
       code: 'SCI-MATH',
       name: 'วิทย์-คณิต',
       capacity: 120,
-      registrationStart: new Date('2024-02-01'),
-      registrationEnd: new Date('2024-02-28'),
+      registrationStart: new Date('2024-12-01'),
+      registrationEnd: new Date('2025-12-31'),
     },
     {
       code: 'LANG-MATH',
       name: 'ศิลป์-คำนวณ',
       capacity: 80,
-      registrationStart: new Date('2024-02-01'),
-      registrationEnd: new Date('2024-02-28'),
+      registrationStart: new Date('2024-12-01'),
+      registrationEnd: new Date('2025-12-31'),
     },
     {
       code: 'LANG-LANG',
       name: 'ศิลป์-ภาษา',
       capacity: 80,
-      registrationStart: new Date('2024-02-01'),
-      registrationEnd: new Date('2024-02-28'),
+      registrationStart: new Date('2024-12-01'),
+      registrationEnd: new Date('2025-12-31'),
     },
   ]
 
@@ -67,7 +67,11 @@ async function main() {
           academicYearId: academicYear.id,
         },
       },
-      update: {},
+      update: {
+        registrationStart: course.registrationStart,
+        registrationEnd: course.registrationEnd,
+        isOpen: true,
+      },
       create: {
         ...course,
         isOpen: true,
